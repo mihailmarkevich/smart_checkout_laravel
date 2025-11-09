@@ -1,0 +1,76 @@
+version: '3.9'
+
+services:
+  app:
+    build:
+      context: ./docker/app
+    container_name: smartcheckout_app
+    working_dir: /var/www/html
+    user: ${DOCKER_USER}:${DOCKER_GROUP}
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      - db
+      - redis
+
+  queue-worker:
+    build:
+      context: ./docker/app
+    container_name: smartcheckout_queue
+    working_dir: /var/www/html
+    user: ${DOCKER_USER}:${DOCKER_GROUP}
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      - app
+      - redis
+    command: php artisan queue:work redis --queue=default,wms --sleep=3 --tries=3
+
+  scheduler:
+    build:
+      context: ./docker/app
+    container_name: smartcheckout_scheduler
+    working_dir: /var/www/html
+    user: ${DOCKER_USER}:${DOCKER_GROUP}
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      - app
+    command: php artisan schedule:work
+
+
+  nginx:
+    build:
+      context: ./docker/nginx
+    container_name: smartcheckout_nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      - app
+
+  db:
+    image: mysql:8.0
+    container_name: smartcheckout_db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+
+  redis:
+    image: redis:7
+    container_name: smartcheckout_redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  db_data:
+
+  
